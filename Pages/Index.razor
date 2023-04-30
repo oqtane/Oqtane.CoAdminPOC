@@ -47,11 +47,11 @@
     string Organization = "";
     string ApiKey = "";
     string password = "";
-    string InputPassword = "password";
+    string InputPassword = "";
 
     int selectedTabIndex = 0;
     bool InProgress = false;
-    string InputText = "Create a short 3 word greeting to Michael";
+    string InputText = "";
     string InstructionPrompt = "";
     string JSONFile = "";
 
@@ -69,6 +69,8 @@
         if (firstRender)
         {
             InstructionPrompt = await localStorage.GetItemAsync<string>("InstructionPrompt");
+            InputText = await localStorage.GetItemAsync<string>("InputText");
+            StateHasChanged();
         }
     }
 
@@ -80,6 +82,17 @@
     async Task SaveInstruction()
     {
         await localStorage.SetItemAsync("InstructionPrompt", InstructionPrompt);
+
+        var Notification = new NotificationMessage()
+            {
+                Style = "position: absolute; left: -1000px;",
+                Severity = NotificationSeverity.Success,
+                Summary = "Saved",
+                Detail = "Instruction Prompt Saved",
+                Duration = 40000
+            };
+
+        NotificationService.Notify(Notification);
     }
 
     async Task CallService()
@@ -124,6 +137,8 @@
             var result = await api.ChatEndpoint.GetCompletionAsync(chatRequest);
 
             JSONFile = result.FirstChoice;
+
+            await localStorage.SetItemAsync("InputText", InputText);
 
             selectedTabIndex = 2;
 
