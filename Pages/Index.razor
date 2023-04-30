@@ -1,0 +1,147 @@
+﻿@page "/"
+@using OpenAI;
+@using OpenAI.Chat;
+@using OpenAI.Models;
+@inject IConfiguration _configuration
+@inject NotificationService NotificationService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IJSRuntime _jsRuntime
+<PageTitle>Index</PageTitle>
+<RadzenTabs TabPosition="@tabPosition" @bind-SelectedIndex=@selectedTabIndex RenderMode="TabRenderMode.Server">
+    <Tabs>
+        <RadzenTabsItem Text="Input Text">
+            <RadzenRow>
+                <RadzenColumn Size="12">
+                    @if (InProgress)
+                    {
+                        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+                    }
+                    else
+                    {
+                        <RadzenSpeechToTextButton Change="@(args => OnSpeechCaptured(args))" />
+                        <RadzenButton Click=@CallService Text="Create JSON" ButtonStyle="ButtonStyle.Success" />
+                        <span>Password: <RadzenPassword @bind-Value=@InputPassword /></span>
+                        <RadzenTextArea @bind-Value=@InputText Rows="20" class="w-100" Style="margin-top:15px" />
+                    }
+                </RadzenColumn>
+            </RadzenRow>
+        </RadzenTabsItem>
+        <RadzenTabsItem Text="Instruction Prompt">
+            <RadzenRow>
+                <RadzenColumn Size="12">
+                    <RadzenButton Click=@SaveInstruction Text="Save" ButtonStyle="ButtonStyle.Primary" />
+                    <RadzenTextArea @bind-Value=@InstructionPrompt Rows="20" class="w-100" Style="margin-top:15px" />
+                </RadzenColumn>
+            </RadzenRow>
+        </RadzenTabsItem>
+        <RadzenTabsItem Text="JSON File">
+            <RadzenRow>
+                <RadzenColumn Size="12">
+                    <RadzenTextArea @bind-Value=@JSONFile Rows="20" class="w-100" Style="margin-top:15px" />
+                </RadzenColumn>
+            </RadzenRow>
+        </RadzenTabsItem>
+    </Tabs>
+</RadzenTabs>
+@code {
+    string Organization = "";
+    string ApiKey = "";
+    string password = "";
+    string InputPassword = "password";
+
+    int selectedTabIndex = 0;
+    bool InProgress = false;
+    string InputText = "Create a short 3 word greeting to Michael";
+    string InstructionPrompt = "";
+    string JSONFile = "";
+
+    TabPosition tabPosition = TabPosition.Top;
+
+    protected override void OnInitialized()
+    {
+        password = _configuration["Password"] ?? "";
+        Organization = _configuration["OpenAIServiceOptions:Organization"] ?? "";
+        ApiKey = _configuration["OpenAIServiceOptions:ApiKey"] ?? "";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            InstructionPrompt = await localStorage.GetItemAsync<string>("InstructionPrompt");
+        }
+    }
+
+    void OnSpeechCaptured(string speechValue)
+    {
+        InputText += speechValue;
+    }
+
+    async Task SaveInstruction()
+    {
+        await localStorage.SetItemAsync("InstructionPrompt", InstructionPrompt);
+    }
+
+    async Task CallService()
+    {
+        if (InputPassword.ToLower() != password.ToLower())
+        {
+            var Notification = new NotificationMessage()
+                {
+                    Style = "position: absolute; left: -1000px;",
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Invalid Password",
+                    Detail = "Invalid password supplied",
+                    Duration = 40000
+                };
+
+            NotificationService.Notify(Notification);
+            return;
+        }
+
+        InProgress = true;
+        StateHasChanged();
+
+        try
+        {
+            // Create a new instance of OpenAIClient using
+            // the ApiKey and Organization
+            var api =
+            new OpenAIClient(new OpenAIAuthentication(ApiKey, Organization));
+
+            // Create a new list of chatMessages objects
+            var chatMessages = new List<Message>();
+            chatMessages.Add(new Message(Role.System, InstructionPrompt));
+            chatMessages.Add(new Message(Role.User, InputText));
+
+            // Call ChatGPT
+            // Create a new ChatRequest object with the chat prompts and pass
+            // it to the API's GetCompletionAsync method
+            // API Access to GPT4 is required for this call to work
+            // temperature is set to 0.0, which controls the randomness
+            // Lower values produce more deterministic outputs.
+            var chatRequest = new ChatRequest(chatMessages, temperature: 0.0, model: Model.GPT4);
+            var result = await api.ChatEndpoint.GetCompletionAsync(chatRequest);
+
+            JSONFile = result.FirstChoice;
+
+            selectedTabIndex = 2;
+
+        }
+        catch (Exception ex)
+        {
+            var Notification = new NotificationMessage()
+                {
+                    Style = "position: absolute; left: -1000px;",
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = ex.Message,
+                    Duration = 40000
+                };
+            NotificationService.Notify(Notification);
+        }
+
+        InProgress = false;
+        StateHasChanged();
+    }
+}
