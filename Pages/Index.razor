@@ -57,32 +57,50 @@
 
     TabPosition tabPosition = TabPosition.Top;
 
+    // This method initializes the component
     protected override void OnInitialized()
     {
+        // Get the password from the configuration, default to an empty string if not found
         password = _configuration["Password"] ?? "";
+
+        // Get the organization from the configuration, default to an empty string if not found
         Organization = _configuration["OpenAIServiceOptions:Organization"] ?? "";
+
+        // Get the API key from the configuration, default to an empty string if not found
         ApiKey = _configuration["OpenAIServiceOptions:ApiKey"] ?? "";
     }
 
+    // This method is called after the component is rendered
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // Check if it's the first render of the component
         if (firstRender)
         {
+            // Get the instruction prompt from local storage
             InstructionPrompt = await localStorage.GetItemAsync<string>("InstructionPrompt");
+
+            // Get the input text from local storage
             InputText = await localStorage.GetItemAsync<string>("InputText");
+
+            // Notify the framework that the state has changed and the UI should be updated
             StateHasChanged();
         }
     }
 
+    // This method is called when speech is captured
     void OnSpeechCaptured(string speechValue)
     {
+        // Append the captured speech value to the input text
         InputText += speechValue;
     }
 
+    // This method saves the instruction prompt to local storage
     async Task SaveInstruction()
     {
+        // Save the instruction prompt to local storage
         await localStorage.SetItemAsync("InstructionPrompt", InstructionPrompt);
 
+        // Create a success notification message
         var Notification = new NotificationMessage()
             {
                 Style = "position: absolute; left: -1000px;",
@@ -92,13 +110,17 @@
                 Duration = 40000
             };
 
+        // Show the notification
         NotificationService.Notify(Notification);
     }
 
+    // This method calls the GPT-4 service
     async Task CallService()
     {
+        // Check if the entered password is correct
         if (InputPassword.ToLower() != password.ToLower())
         {
+            // Create an error notification message
             var Notification = new NotificationMessage()
                 {
                     Style = "position: absolute; left: -1000px;",
@@ -108,19 +130,21 @@
                     Duration = 40000
                 };
 
+            // Show the notification
             NotificationService.Notify(Notification);
             return;
         }
 
+        // Set the in-progress flag to true
         InProgress = true;
+
+        // Notify the framework that the state has changed and the UI should be updated
         StateHasChanged();
 
         try
         {
-            // Create a new instance of OpenAIClient using
-            // the ApiKey and Organization
-            var api =
-            new OpenAIClient(new OpenAIAuthentication(ApiKey, Organization));
+            // Create a new instance of OpenAIClient using the ApiKey and Organization
+            var api = new OpenAIClient(new OpenAIAuthentication(ApiKey, Organization));
 
             // Create a new list of chatMessages objects
             var chatMessages = new List<Message>();
@@ -136,15 +160,18 @@
             var chatRequest = new ChatRequest(chatMessages, temperature: 0.0, model: Model.GPT4);
             var result = await api.ChatEndpoint.GetCompletionAsync(chatRequest);
 
+            // Save the first choice result as a JSON file
             JSONFile = result.FirstChoice;
 
+            // Save the input text to local storage
             await localStorage.SetItemAsync("InputText", InputText);
 
+            // Set the selected tab index to 2 (Results tab)
             selectedTabIndex = 2;
-
         }
         catch (Exception ex)
         {
+            // Create an error notification message
             var Notification = new NotificationMessage()
                 {
                     Style = "position: absolute; left: -1000px;",
@@ -153,10 +180,15 @@
                     Detail = ex.Message,
                     Duration = 40000
                 };
+
+            // Show the notification
             NotificationService.Notify(Notification);
         }
 
+        // Set the in-progress flag to false
         InProgress = false;
+
+        // Notify the framework that the state has changed and the UI should be updated
         StateHasChanged();
     }
 }
