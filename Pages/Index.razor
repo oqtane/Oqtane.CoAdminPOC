@@ -157,7 +157,7 @@
             // API Access to GPT4 is required for this call to work
             // temperature is set to 0.0, which controls the randomness
             // Lower values produce more deterministic outputs.
-            var chatRequest = new ChatRequest(chatMessages, temperature: 0.0, model: Model.GPT4);
+            var chatRequest = new ChatRequest(chatMessages, temperature: 0.0, model: Model.GPT3_5_Turbo);
             var result = await api.ChatEndpoint.GetCompletionAsync(chatRequest);
 
             // Save the first choice result as a JSON file
